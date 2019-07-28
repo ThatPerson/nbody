@@ -24,7 +24,9 @@ Or with time in the 4th dimension as colour;
 
 The input files are given as
 
-```STEPS:PRINT:DT
-X,Y,Z,XV,YV,ZV,M```
+```
+STEPS:PRINT:DT
+X,Y,Z,XV,YV,ZV,M
+```
 
 Where X, Y, Z are the position, XV, YV and ZV are the initial velocities, and M is the mass. 
