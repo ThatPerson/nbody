@@ -13,6 +13,8 @@ typedef struct {
 typedef struct {
 	obj objects[50];
 	int n_objects;
+    int print, step;
+    float dt;
 } sys;
 
 v_3 force_v(obj a, obj b) {
@@ -61,6 +63,28 @@ int iterate_pos_v(float dt, sys *syst, int n) {
     return 1;
 }
 
+int read_input(char * filename, sys *syst) {
+    printf("%s\n", filename);
+    FILE * fp;
+    fp = fopen(filename, "r");
+    int n = 0;
+    fscanf(fp, "%d:%d:%f", &syst->step, &syst->print, &syst->dt);
+    while (fscanf(fp, "%f,%f,%f,%f,%f,%f,%f", 
+        &syst->objects[n].pos.v[0],
+        &syst->objects[n].pos.v[1],
+        &syst->objects[n].pos.v[2],
+        &syst->objects[n].vel.v[0],
+        &syst->objects[n].vel.v[1],
+        &syst->objects[n].vel.v[2],
+        &syst->objects[n].m) != EOF) 
+    {
+        n++;
+    }
+    syst->n_objects = n;
+    printf("%d\n", n);
+    fclose(fp);
+}
+
 int main(int argc, char*argv[]) {
 	/*v_3 a = {2, 3, 4};
 	v_3 b = {4, 3, 8};
@@ -72,41 +96,50 @@ int main(int argc, char*argv[]) {
 	printf("%f\n", mag_3(norm_3(a, 3)));*/
 	
 	sys syst;
-	syst.n_objects = 2;
-	syst.objects[0].pos = gen_3(-0.5, 0, 0);
-	syst.objects[0].vel = gen_3(0, 1, 0);
-	syst.objects[0].m = 1;
-	syst.objects[1].pos = gen_3(0.5, 0, 0);
-	syst.objects[1].vel = gen_3(0, 0, 0);
-	syst.objects[1].m = 1;
 	int t;
 	int n;
-    FILE * outputs[50];
-    char fname[50];
-    char base_name[50] = "";
-    if (argc >= 1)
-        strcpy(base_name, argv[0]);
-    for (t = 0; t < syst.n_objects; t++) {
-        sprintf(fname, "%s-%d.csv", base_name, t);
-        outputs[t] = fopen(fname, "w");
-        if (outputs[t] == NULL) {
-            printf("Failed to open file\n");
-            exit(0);
-        }
+	FILE * outputs[50];
+	char fname[50];
+	char base_name[50] = "";
+    char input_name[50];
+
+    if (argc == 1) {
+        printf("Please enter filename\n");
+        exit(0);
     }
-	for (t = 0; t < 1000000; t++) {
-		
-		for (n = 0; n < syst.n_objects; n++) {
-            if (t % 100 == 0) {
-                fprintf(outputs[n], "%f, ", t*0.00001);
-                f_print_3(&outputs[n], syst.objects[n].pos);
-            }
-			gravity_v(0.00001, &syst, n);
-			
+    strcpy(input_name, argv[1]);
+    if (argc > 2)
+        strcpy(base_name, argv[2]);
+    if (read_input(input_name, &syst) == -1) {
+        printf("Error in reading file\n");
+        exit(0);
+    }
+    
+    
+	for (t = 0; t < syst.n_objects; t++) {
+		sprintf(fname, "%s-%d.csv", base_name, t);
+		outputs[t] = fopen(fname, "w");
+		if (outputs[t] == NULL) {
+			printf("Failed to open file\n");
+			exit(0);
 		}
-		for (n = 0; n < syst.n_objects; n++)
-            iterate_pos_v(0.00001, &syst, n);
-		
+	}
+	char in[50];
+	while (strcmp(in, "exit") != 0) {
+		scanf("%s", in);
+        for (t = 0; t < syst.step; t++) {
+            for (n = 0; n < syst.n_objects; n++) {
+                if (t % syst.print == 0) {
+                    fprintf(outputs[n], "%f, ", t*syst.dt);
+                    f_print_3(&outputs[n], syst.objects[n].pos);
+                }
+                gravity_v(syst.dt, &syst, n);
+                
+            }
+            for (n = 0; n < syst.n_objects; n++)
+                iterate_pos_v(syst.dt, &syst, n);
+            
+        }
 	}
 	for (t = 0; t < syst.n_objects; t++) {
         fclose(outputs[t]);
