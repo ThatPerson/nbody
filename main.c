@@ -4,6 +4,7 @@
 #include <string.h>
 #include "vec_3.c"
 #define G 1
+#define collisions 1
 
 typedef struct {
 	v_3 pos, vel;
@@ -17,21 +18,47 @@ typedef struct {
 	float dt;
 } sys;
 
-v_3 force_v(obj a, obj b) {
+int force_v(obj a, obj b, v_3 * force) {
 	/* This function returns the unitary force between two objects, from the 
 	 * perspective of object a. */
 	/* Calculates F = GMm/r^2, and then returns a vector of magnitude F along
 	 * the vector connecting the two objects */
 	float r = mag_3(sub_3(a.pos, b.pos));
 
+    if (collisions == 1 && r < 0.001)
+        return -1;
 	if (r < 0.00001) {
+        /* Collision. Combine the two somehow. */
 		printf("Too close..\n");
 		exit(0);
 	}
 	float F = (G * a.m * b.m) / pow(r, 2);
 
-	v_3 radial = norm_3(sub_3(a.pos, b.pos), F);
-	return radial;
+	*force = norm_3(sub_3(a.pos, b.pos), F);
+	return 1;
+}
+
+int combine_v(obj * a, obj * b) {
+    printf("COMBINING\n");
+    v_3 ma = s_mul_3(a->m, a->vel);
+    v_3 mb = s_mul_3(b->m, b->vel);
+    a->vel = s_mul_3(1. / (a->m + b->m), add_3(ma, mb));
+    a->pos = s_mul_3(1/2., add_3(a->pos, b->pos));
+    b->pos = gen_3(0,0,0);
+    a->m = a->m + b->m;
+    b->m = 0;
+    b->vel = gen_3(0,0,0);
+
+    printf("New A\n");
+    print_3(a->vel);
+    print_3(a->pos);
+    printf("%f\n", a->m);
+    printf("New B\n");
+    print_3(b->vel);
+    print_3(b->pos);
+    printf("%f\n", b->m);
+
+    return 1;
 }
 
 int gravity_v(float dt, sys *syst, int n) {
@@ -44,10 +71,17 @@ int gravity_v(float dt, sys *syst, int n) {
 	for (i = 0; i < syst->n_objects; i++) {
 		if (n == i)
 			continue;
-		force = force_v(syst->objects[i], syst->objects[n]);
-		force = s_mul_3(1, force); // acceleration
-		force = s_mul_3(dt, force); // a = dv/dt, dv = a dt
-		resultant = add_3(resultant, force);
+		if (force_v(syst->objects[i], syst->objects[n], &force) == 1) {
+            if (syst->objects[n].m == 0)
+                continue;
+            force = s_mul_3(1/syst->objects[n].m, force); // acceleration
+            force = s_mul_3(dt, force); // a = dv/dt, dv = a dt
+            resultant = add_3(resultant, force);
+        } else {
+            // combine the two particles
+            // (ma va + mb vb)/(ma + mb)
+            combine_v(&syst->objects[i], &syst->objects[n]);
+        }
 	}
 	
 	
@@ -129,7 +163,7 @@ int main(int argc, char*argv[]) {
 		scanf("%s", in);
 		for (t = 0; t < syst.step; t++) {
 			for (n = 0; n < syst.n_objects; n++) {
-				if (t % syst.print == 0) {
+				if (t % syst.print == 0 && syst.objects[n].m != 0) {
 					fprintf(outputs[n], "%f, ", t*syst.dt);
 					f_print_3(&outputs[n], syst.objects[n].pos);
 				}
